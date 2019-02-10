@@ -38,11 +38,16 @@ def process_event(event):
         sys.exit(1)
 
 
+def kill():
+    sys.exit(0)
+
+
 def main():
     credentials = aiy.assistant.auth_helpers.get_assistant_credentials()
     with Assistant(credentials) as assistant:
-        for event in assistant.start():
-            process_event(event)
+        process_event(EventType.ON_CONVERSATION_TURN_STARTED)
+        # for event in assistant.start():
+        #     process_event(event)
 
 
 if __name__ == '__main__':

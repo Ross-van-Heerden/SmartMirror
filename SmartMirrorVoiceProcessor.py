@@ -27,8 +27,17 @@ def main():
             print('Sorry, I did not hear you.')
         else:
             print('You said "', text, '"')
-            if 'goodbye' in text:
+            if 'thank you' in text:
                 break
+            elif 'start Google Assistant':
+                # Start 2 processes, one for Google Assistant, and one for the reactivation trigger.
+                print('Starting Google Assistant...')
+                p1 = Process(target=GoogleAssistant.main)
+                p1.start()
+                p2 = Process(target=wait_for_activation_trigger(recognizer, p1))
+                p2.start()
+                p1.join()
+                p2.join()
 
 
 # Custom activation trigger
@@ -37,6 +46,14 @@ def wait_for_activation_trigger(recognizer):
         text = recognizer.recognize()
         if 'hello' in text:
             break
+
+
+def wait_for_reactivation_trigger(recognizer, google_assistant_process):
+    while True:
+        text = recognizer.recognize()
+        if 'close Google Assistant' or 'end Google Assistant' in text:
+            print('Closing Google Assistant...')
+            google_assistant_process.terminate()
 
 
 if __name__ == '__main__':
