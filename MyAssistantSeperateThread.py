@@ -20,15 +20,11 @@ code doesn't need to record audio. Hot word detection "OK, Google" is supported.
 
 It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
-
-import logging
-import sys
-import threading
-
-import aiy.assistant.auth_helpers
-from aiy.assistant.library import Assistant
+import aiy.audio
+import aiy.cloudspeech
 import aiy.voicehat
-from google.assistant.library.event import EventType
+import logging
+import threading
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,7 +32,44 @@ logging.basicConfig(
 )
 
 
-class GoogleAssistant(object):
+def _run_task():
+    recognizer = aiy.cloudspeech.get_recognizer()
+    recognizer.expect_phrase('turn off the light')
+    recognizer.expect_phrase('turn on the light')
+    recognizer.expect_phrase('blink')
+    recognizer.expect_phrase('hello')
+
+    led = aiy.voicehat.get_led()
+    aiy.audio.get_recorder().start()
+
+    while True:
+        wait_for_activation_trigger(recognizer)
+        print('Listening...')
+        text = recognizer.recognize()
+        if not text:
+            print('Sorry, I did not hear you.')
+        else:
+            print('You said "', text, '"')
+            if 'turn on the light' in text:
+                led.set_state(aiy.voicehat.LED.ON)
+            elif 'turn off the light' in text:
+                led.set_state(aiy.voicehat.LED.OFF)
+            elif 'blink' in text:
+                led.set_state(aiy.voicehat.LED.BLINK)
+            elif 'goodbye' in text:
+                continue
+
+
+# Custom activation trigger
+def wait_for_activation_trigger(recognizer):
+    while True:
+        text = recognizer.recognize()
+        if text is not None:
+            if 'hello' in text:
+                break
+
+
+class MyAssistant(object):
     """An assistant that runs in the background.
 
     The Google Assistant Library event loop blocks the running thread entirely.
@@ -46,9 +79,7 @@ class GoogleAssistant(object):
     """
 
     def __init__(self):
-        self._task = threading.Thread(target=self._run_task)
-        self._can_start_conversation = False
-        self._assistant = None
+        self._task = threading.Thread(target=_run_task)
 
     def start(self):
         """Starts the assistant.
@@ -57,37 +88,9 @@ class GoogleAssistant(object):
         """
         self._task.start()
 
-    def _run_task(self):
-        recognizer = aiy.cloudspeech.get_recognizer()
-        recognizer.expect_phrase('turn off the light')
-        recognizer.expect_phrase('turn on the light')
-        recognizer.expect_phrase('blink')
-
-        button = aiy.voicehat.get_button()
-        led = aiy.voicehat.get_led()
-        aiy.audio.get_recorder().start()
-
-        while True:
-            print('Press the button and speak')
-            button.wait_for_press()
-            print('Listening...')
-            text = recognizer.recognize()
-            if not text:
-                print('Sorry, I did not hear you.')
-            else:
-                print('You said "', text, '"')
-                if 'turn on the light' in text:
-                    led.set_state(aiy.voicehat.LED.ON)
-                elif 'turn off the light' in text:
-                    led.set_state(aiy.voicehat.LED.OFF)
-                elif 'blink' in text:
-                    led.set_state(aiy.voicehat.LED.BLINK)
-                elif 'goodbye' in text:
-                    break
-
 
 def main():
-    GoogleAssistant().start()
+    MyAssistant().start()
 
 
 if __name__ == '__main__':
